@@ -1,0 +1,118 @@
+---
+title: "HW6"
+author: "Haichen Liu"
+date: "2015Äê11ÔÂ19ÈÕ"
+output: html_document
+---
+
+## Required packages
+```{r}
+require(Sleuth3)
+require(HiDimDA)
+require(klaR)
+require(rpart)
+```
+
+```{r}
+hw6 <- ex1223
+hw6$Esteem <- rep(0,nrow(hw6))
+for (i in 1:nrow(hw6))
+{
+  if (hw6$Esteem1[i]==1) hw6$Esteem[i]=1
+  else hw6$Esteem[i]==0
+}
+hw6$Esteem <- as.factor(hw6$Esteem)
+hw6$LogIncome2005 <- log(hw6$Income2005)
+```
+
+## Divide the data into test and training data sets. Do data partition and create two data sets "trainhw6" and "testhw6".
+```{r}
+set.seed(1234)
+hw6[,'train'] <- ifelse(runif(nrow(hw6))<0.80,1,0)
+trainColNum <- grep('train',names(hw6))
+trainhw6 <- hw6[hw6$train==1,-trainColNum]
+testhw6 <- hw6[hw6$train==0,-trainColNum]
+```
+
+
+
+
+
+## The logit model
+```{r}
+hw6glm<- glm(Esteem~LogIncome2005+AFQT+Educ+Gender,family = binomial(logit) ,data = trainhw6)
+summary(hw6glm)
+exp(cbind(OR = coef(hw6glm), confint(hw6glm)))
+```
+### According to the outputs above, all the coefficients in the model is statistically significant under alpha level of 0.05, so the model is fitted as :
+#### logit(Esteem)=-2.399598+ 0.129822*LogIncome2005+0.009266*AFQT+0.066264*Educ-0.058604*Gendermale
+#### Odds of strong agreement increase by exp(0.129822)=1.138626 times as LogIncome2005(income) increase 1 unit
+#### Odds of strong agreement increase by exp(0.009266)=1.009309 times as AFQT(intelligence) increase 1 unit
+#### Odds of strong agreement increase by exp(0.066264)=1.068509 times as Educ(education) increase 1 unit
+#### Odds of strong agreement of a male is exp(-0.058604)=0.9430802 times of the odds female
+
+
+
+
+
+
+
+## Apply the logistic model and create a confusion table.
+```{r}
+pre1.fit <- predict(hw6glm, testhw6,type="response")
+pred.fit <- rep('0',length(pre1.fit))
+pred.fit[pre1.fit>=0.5] <- '1'
+table(Predicted=pred.fit,Original=testhw6$Esteem)
+```
+### For the GLM, the accuarcy rate is 301/511(58.90%). 
+
+
+
+
+
+## Linear Discriminant Analysis
+```{r}
+hwpa <- cbind(trainhw6$LogIncome2005,trainhw6$AFQT,trainhw6$Educ,trainhw6$Gender)
+hwlda <- Dlda(hwpa,trainhw6$Esteem)
+print(hwlda)
+testhw61 <- cbind(testhw6$LIncome2005,testhw6$AFQT,testhw6$Educ,testhw6$Gender)
+Predicted <- predict(hwlda,testhw61,grpcodes=levels(testhw6$Esteem))$class  
+Original <- testhw6$Esteem
+table(Predicted,Original)
+```
+### The accuarcy rate of LDA method is 306/511(59.88%).
+
+
+
+
+
+## Regularized Discriminant Analysis 
+```{r}
+hwrda <- rda(Esteem~LogIncome2005+AFQT+Educ+Gender,data=trainhw6,gamma=0.05,lambda = 0.2)
+y <- predict(hwrda, testhw6)
+table(Predicted=y$class, Original=testhw6$Esteem)
+```
+### The accuarcy rate of RDA method is 303/511(59.30%).
+
+
+
+
+
+## Regression Trees
+```{r}
+tree <- rpart(Esteem~LogIncome2005+AFQT+Educ+Gender, data = trainhw6)
+pred <- rep("1",nrow(testhw6))
+for (i in 1:nrow(testhw6))
+if (testhw6$Educ[i]<13.5 && testhw6$AFQT[i]<18.2425)
+pred[i] <- "0"
+table(Predicted=pred,Original=testhw6$Esteem)
+```
+### The accuarcy rate of Regression Trees method is 310/511(60.67%).
+
+
+
+
+
+
+## Conclusion
+#### All the models indicate that all the four predictors should be included in the model, and among Logistic regression, LDA, RDA, Regression Trees, the Regression Trees method provides the best predictions with an accuarcy rate of 60.67%. So we prefer to use Regression Trees to do the prediction.
